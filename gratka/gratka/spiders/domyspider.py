@@ -13,28 +13,44 @@ class DomyScrapper(scrapy.Spider):
 
     def parse(self, response):
         for houses in response.css('div.listing__teaserWrapper'):
-            try:
-                yield {
-                    'location': houses.css('span.teaserUnified__location::text').get().replace('                                ','').strip(),
-                    'latitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + houses.css('span.teaserUnified__location::text').get().replace('                                ','').strip() + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lat'],
-                    'longitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + houses.css('span.teaserUnified__location::text').get().replace('                                ','').strip() + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lon'],
-                    'title': houses.css('h2.teaserUnified__title::text').get().strip(),
-                    'description': houses.css('p.teaserUnified__description::text').get().strip(),
-                    'total_price': houses.css('p.teaserUnified__price::text').get().strip(),
-                    'additional_price': houses.css('span.teaserUnified__additionalPrice::text').get().replace('zł/m','').strip(),
-                    'surface_area': houses.css('li.teaserUnified__listItem::text').get().replace('m','').strip()
-                }
-            except:
-                yield {
-                    'location': houses.css('span.teaserUnified__location::text').get().replace('                                ','').strip(),
-                    'latitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + houses.css('span.teaserUnified__location::text').get().replace('                                ','').strip() + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lat'],
-                    'longitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + houses.css('span.teaserUnified__location::text').get().replace('                                ','').strip() + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lon'],
-                    'title': houses.css('h2.teaserUnified__title::text').get().strip(),
-                    'description': 'none',
-                    'total_price': 'unknown',
-                    'additional_price': 'none',
-                    'surface_area': houses.css('li.teaserUnified__listItem::text').get().replace('m','').strip()
-                }
-            # next_page = response.css('a.pagination__nextPage').attrib['href']
-            # if next_page is not None:
-            #     yield response.follow(next_page, callback=self.parse)
+            house_url = houses.css('a.teaserLink').attrib['href']
+            yield response.follow(house_url, callback=self.house_parse)
+
+
+
+        next_page = response.css('a.pagination__nextPage').attrib['href']
+        if next_page is not None:
+            yield response.follow(next_page, callback=self.parse)
+
+
+    def house_parse(self,response):
+        def innertext_quick(elements, delimiter=""):
+            return list(delimiter.join(el.strip() for el in element.css('*::text').getall()) for element in elements)
+        
+
+        location = str(innertext_quick(response.css('span.offerLocation'))).replace("['","").replace("']","")
+        # try:
+        yield {
+            'location': location,
+            'latitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + location + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lat'],
+            'longitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + location + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lon'],
+            'title': response.css('h1.sticker__title::text').get().strip(),
+            'total_price': response.css('span.priceInfo__value::text').get().strip(),
+            'additional_price': response.css('span.priceInfo__additional::text').get().strip(),
+            response.xpath("//ul[@class='parameters__singleParameters']/li[2]/b/preceding-sibling::span/text()").get(): response.xpath("//ul[@class='parameters__singleParameters']/li[2]/b/text()").get(),
+            response.xpath("//ul[@class='parameters__singleParameters']/li[3]/b/preceding-sibling::span/text()").get(): response.xpath("//ul[@class='parameters__singleParameters']/li[3]/b/text()").get(),
+            response.xpath("//ul[@class='parameters__singleParameters']/li[4]/b/preceding-sibling::span/text()").get(): response.xpath("//ul[@class='parameters__singleParameters']/li[4]/b/text()").get(),
+            response.xpath("//ul[@class='parameters__singleParameters']/li[5]/b/preceding-sibling::span/text()").get(): response.xpath("//ul[@class='parameters__singleParameters']/li[5]/b/text()").get(),
+            response.xpath("//ul[@class='parameters__singleParameters']/li[6]/b/preceding-sibling::span/text()").get(): response.xpath("//ul[@class='parameters__singleParameters']/li[6]/b/text()").get(),
+            'description': str(innertext_quick(response.css('div.description__rolled.ql-container'))).replace("['","").replace("']","")
+        }
+        # except:
+        #     yield {
+        #         'location': location,
+        #         'latitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + location + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lat'],
+        #         'longitude': requests.get(url = ("https://api.geoapify.com/v1/geocode/search?text=") + location + ("&apiKey=4b9bd8602e0541b6829e69a7a849d58e")).json()['features'][0]['properties']['lon'],
+        #         'title': response.css('h1.sticker__title::text').get().strip(),
+        #         'total_price': 'unkmown',
+        #         'additional_price': 'unknown',
+        #         'description': "unknown"
+        #     }
